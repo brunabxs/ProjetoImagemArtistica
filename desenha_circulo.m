@@ -1,4 +1,4 @@
-function imagem = desenha_circulo(imagem, dx, dy)
+function imagem = desenha_circulo(imagem, dx, dy, tonalidade)
     % tamanho da imagem
     [width, height] = size(imagem);
 
@@ -9,5 +9,5 @@ function imagem = desenha_circulo(imagem, dx, dy)
     Z = (X + dx).^2 + (Y + dy).^2; 
 
     % gera imagem
-    imagem(find(Z <= 10^2)) = 1; 
+    imagem(find(Z <= 10^2)) = tonalidade; 
 end
