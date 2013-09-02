@@ -1,13 +1,16 @@
-function imagem = desenhar_individuo(individuo, genes_atributo, total_atributos, total_circulos)
+%opcoes = struct('atributos', 3, 'bits_atributo', 3, 'circulos', 2,
+%'raio_circulo', 5, 'imagem', 8)
+
+function imagem = desenhar_individuo(individuo, opcoes)
     % converte a sequencia de bits para uma matriz contendo as informacoes
     % de cada circulo
-    individuo = gerar_individuo(individuo, genes_atributo, total_atributos, total_circulos);
+    individuo = gerar_individuo(individuo, opcoes.bits_atributo, opcoes.atributos, opcoes.circulos);
         
-    % cria a imagem 256 x 256
-    imagem = zeros([8 8]);
+    % cria a imagem 
+    imagem = zeros([opcoes.imagem opcoes.imagem]);
     
     % desenha o circulo correspondente na imagem
-    for i = 1:total_circulos;
+    for i = 1:opcoes.circulos;
         imagem = desenha_circulo(imagem, individuo(i,1), individuo(i,2), individuo(i,3));
     end    
 end
