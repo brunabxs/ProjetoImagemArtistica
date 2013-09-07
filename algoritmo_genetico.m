@@ -6,16 +6,16 @@ function [imagem, individuo_perfeito, circulos] = algoritmo_genetico()
 
     % algoritmo genetico
     total_genes = opcoes.bits_atributo * opcoes.atributos * opcoes.circulos;
-    opcoes_genetico = gaoptimset('PopulationSize', 20, 'PopulationType', 'bitstring', 'Generations', 1000, 'SelectionFcn', @selectionroulette, 'CrossoverFraction', 0.8);
+    opcoes_genetico = gaoptimset('PopulationSize', 20, 'PopulationType', 'bitstring', 'Generations', 5000, 'SelectionFcn', @selectionroulette, 'CrossoverFraction', 0.8);
     [individuo_perfeito, avaliacao_individuo_perfeito] = ga(@funcao_avaliacao, total_genes, [], [], [], [], [], [], [], opcoes_genetico);
     
     % exibe imagem para individuo final
     imagem = desenhar_individuo(individuo_perfeito, opcoes);
-    imshow(imagem, opcoes.mapa_cores);
+    imshow(imagem);
     
     % salva as imagens
-    imwrite(imagem, opcoes.mapa_cores, 'imagem-aprox.bmp');
-    imwrite(imagem_original, opcoes.mapa_cores, 'imagem-original.bmp');
+    imwrite(imagem, 'imagem-aprox.bmp');
+    imwrite(imagem_original, 'imagem-original.bmp');
     
     % individuo
     circulos = gerar_individuo(individuo_perfeito, opcoes.bits_atributo, opcoes.atributos, opcoes.circulos);
@@ -27,11 +27,12 @@ function preparar()
     
     % imagem
     [imagem_original, mapa_cores_original] = imread('imagem.bmp');
-
-    mapa_cores_original = [0:1 / 255:1]' * ones(1,3);
+    
+    % converter para escala de cinza
+    imagem_original = ind2gray(imagem_original, mapa_cores_original);
     
     % opcoes
-    opcoes = struct('atributos', 3, 'bits_atributo', 8, 'circulos', 1000, 'raio_circulo', 10, 'imagem', 256, 'mapa_cores', mapa_cores_original);
+    opcoes = struct('atributos', 3, 'bits_atributo', 8, 'circulos', 1000, 'raio_circulo', 10, 'imagem', 256);
 end
 
 function resultado = funcao_avaliacao(cromossomo)    
@@ -41,8 +42,8 @@ function resultado = funcao_avaliacao(cromossomo)
     % gera a imagem
     imagem = desenhar_individuo(cromossomo, opcoes);
     
-    %resultado = sum(sum((imagem - double(imagem_original)).^2));
-    resultado = (norm(imagem,'fro') - norm(double(imagem_original),'fro')).^2;
+    resultado = sum(sum((imagem - double(imagem_original)).^2));
+    %resultado = (norm(imagem,'fro') - norm(double(imagem_original),'fro')).^2;
 end
 
 function imagem = desenhar_individuo(individuo, opcoes)
