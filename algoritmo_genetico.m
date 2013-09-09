@@ -1,29 +1,6 @@
-function [imagem, individuo_perfeito, circulos] = algoritmo_genetico()
-    global opcoes
-    global imagem_original
-    
-    preparar();
-
-    % algoritmo genetico
-    total_genes = opcoes.bits_atributo * opcoes.atributos * opcoes.circulos;
-    opcoes_genetico = gaoptimset('PopulationSize', 20, 'PopulationType', 'bitstring', 'Generations', 5000, 'SelectionFcn', @selectionroulette, 'CrossoverFraction', 0.8);
-    [individuo_perfeito, avaliacao_individuo_perfeito] = ga(@funcao_avaliacao, total_genes, [], [], [], [], [], [], [], opcoes_genetico);
-    
-    % exibe imagem para individuo final
-    imagem = desenhar_individuo(individuo_perfeito, opcoes);
-    imshow(imagem);
-    
-    % salva as imagens
-    imwrite(imagem, 'imagem-aprox.bmp');
-    imwrite(imagem_original, 'imagem-original.bmp');
-    
-    % individuo
-    circulos = gerar_individuo(individuo_perfeito, opcoes.bits_atributo, opcoes.atributos, opcoes.circulos);
-end
-
-function preparar()
-    global opcoes
-    global imagem_original
+function [imagem, individuo_perfeito, avaliacao_individuo_perfeito, circulos] = algoritmo_genetico()
+    start = tic;
+    matlabpool open 4;
     
     % imagem
     [imagem_original, mapa_cores_original] = imread('imagem.bmp');
@@ -32,13 +9,28 @@ function preparar()
     imagem_original = ind2gray(imagem_original, mapa_cores_original);
     
     % opcoes
-    opcoes = struct('atributos', 3, 'bits_atributo', 8, 'circulos', 1000, 'raio_circulo', 10, 'imagem', 256);
+    opcoes = struct('bits_atributo', [6, 6, 8, 1], 'circulos', 300, 'raio_circulo', 4, 'imagem', 64);
+    
+    % algoritmo genetico
+    total_genes = sum(opcoes.bits_atributo) * opcoes.circulos;
+    opcoes_genetico = gaoptimset('PopulationSize', 20, 'PopulationType', 'bitstring', 'Generations', 30000, 'SelectionFcn', @selectionroulette, 'CrossoverFraction', 0.8, 'UseParallel', 'always', 'Vectorized', 'off');
+    [individuo_perfeito, avaliacao_individuo_perfeito] = ga(@(cromossomo)funcao_avaliacao(cromossomo, opcoes, imagem_original), total_genes, [], [], [], [], [], [], [], opcoes_genetico);
+    
+    % exibe imagem para individuo final
+    imagem = desenhar_individuo(individuo_perfeito, opcoes);
+    
+    % salva as imagens
+    imwrite(imagem, gray(256), 'imagem-aprox.bmp');
+    imwrite(imagem_original, gray(256), 'imagem-original.bmp');
+    
+    % individuo
+    circulos = gerar_individuo(individuo_perfeito, opcoes.bits_atributo, opcoes.circulos);
+    
+    matlabpool close;
+    toc(start)
 end
 
-function resultado = funcao_avaliacao(cromossomo)    
-    global opcoes
-    global imagem_original
-    
+function resultado = funcao_avaliacao(cromossomo, opcoes, imagem_original)
     % gera a imagem
     imagem = desenhar_individuo(cromossomo, opcoes);
     
@@ -46,36 +38,54 @@ function resultado = funcao_avaliacao(cromossomo)
     %resultado = (norm(imagem,'fro') - norm(double(imagem_original),'fro')).^2;
 end
 
-function imagem = desenhar_individuo(individuo, opcoes)
+function imagem = desenhar_individuo(cromossomo, opcoes)
     % converte a sequencia de bits para uma matriz contendo as informacoes
     % de cada circulo
-    individuo = gerar_individuo(individuo, opcoes.bits_atributo, opcoes.atributos, opcoes.circulos);
+    individuo = gerar_individuo(cromossomo, opcoes.bits_atributo, opcoes.circulos);
         
     % cria a imagem 
     imagem = zeros([opcoes.imagem opcoes.imagem]);
     
     % desenha o circulo correspondente na imagem
     for i = 1:opcoes.circulos;
-        imagem = desenhar_circulo(imagem, individuo(i,1), individuo(i,2), opcoes.raio_circulo, individuo(i,3));
+        if (individuo(i,4))
+            imagem = desenhar_circulo(imagem, individuo(i,1), individuo(i,2), opcoes.raio_circulo, individuo(i,3));
+        end
     end  
 end
 
-function individuo = gerar_individuo(cromossomo, genes_atributo, total_atributos, total_circulos)
+function individuo = gerar_individuo(cromossomo, genes_atributo, total_circulos)
     % separa a sequencia de bits em uma matriz
-    circulos = reshape(cromossomo, genes_atributo, total_atributos, total_circulos);
+    % - (i) linhas indicam o circulo
+    % - (j) colunas indicam os bits dos atributos do circulo i
+    circulos = reshape(cromossomo, sum(genes_atributo), total_circulos)';
     
-    % reordena a matriz de forma que
-    % - (i) linhas indicam um atributo
-    % - (j) colunas indicam o bit do atributo i do circulo k
-    % - (k) profund. indica o circulo
-    circulos = permute(circulos, [2 1 3]);
-    
+    % separa os dados da matriz
     % converte o valor de cada atributo (que esta em binario) em um valor
     % inteiro
-    individuo = ones(total_circulos, total_atributos);
-    for i = 1:total_circulos
-        individuo(i,:) = bi2de(circulos(:,:,i), 'left-msb')';
-    end
+    
+    % posicao X
+    total_genes = 0;
+    X = circulos(:, [1:genes_atributo(1)] + total_genes);
+    X = bi2de(X, 'left-msb');
+    
+    % posicao Y
+    total_genes = total_genes + genes_atributo(1);
+    Y = circulos(:, [1:genes_atributo(2)] + total_genes);
+    Y = bi2de(Y, 'left-msb');
+    
+    % tonalidade
+    total_genes = total_genes + genes_atributo(2);
+    T = circulos(:, [1:genes_atributo(3)] + total_genes);
+    T = bi2de(T, 'left-msb');
+    
+    % exibe ou nao o circulo
+    total_genes = total_genes + genes_atributo(3);
+    E = circulos(:, [1:genes_atributo(4)] + total_genes);
+    E = bi2de(E, 'left-msb');
+    
+    % individuo
+    individuo = [X'; Y'; T'; E']';
 end
 
 function imagem = desenhar_circulo(imagem, dx, dy, raio, tonalidade)
