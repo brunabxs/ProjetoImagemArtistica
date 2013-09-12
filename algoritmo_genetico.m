@@ -9,11 +9,11 @@ function [imagem, individuo_perfeito, avaliacao_individuo_perfeito, circulos] = 
     imagem_original = ind2gray(imagem_original, mapa_cores_original);
     
     % opcoes
-    opcoes = struct('bits_atributo', [6, 6, 8, 1], 'circulos', 300, 'raio_circulo', 4, 'imagem', 64);
+    opcoes = struct('bits_atributo', [8, 8, 8, 5], 'circulos', 1000, 'imagem', 256);
     
     % algoritmo genetico
     total_genes = sum(opcoes.bits_atributo) * opcoes.circulos;
-    opcoes_genetico = gaoptimset('PopulationSize', 20, 'PopulationType', 'bitstring', 'Generations', 30000, 'SelectionFcn', @selectionroulette, 'CrossoverFraction', 0.8, 'UseParallel', 'always', 'Vectorized', 'off');
+    opcoes_genetico = gaoptimset('PopulationSize', 20, 'PopulationType', 'bitstring', 'Generations', 3000, 'SelectionFcn', @selectionroulette, 'CrossoverFraction', 0.8, 'UseParallel', 'always', 'Vectorized', 'off');
     [individuo_perfeito, avaliacao_individuo_perfeito] = ga(@(cromossomo)funcao_avaliacao(cromossomo, opcoes, imagem_original), total_genes, [], [], [], [], [], [], [], opcoes_genetico);
     
     % exibe imagem para individuo final
@@ -33,9 +33,19 @@ end
 function resultado = funcao_avaliacao(cromossomo, opcoes, imagem_original)
     % gera a imagem
     imagem = desenhar_individuo(cromossomo, opcoes);
+    [largura] = size(imagem, 1);
+    tamanho_max = log2 (largura);
+    base = 2 * ones(1, tamanho_max + 1);
+    expoente = - 1 * [0 : tamanho_max];
+    escalas = base.^expoente;
     
-    resultado = sum(sum((imagem - double(imagem_original)).^2));
-    %resultado = (norm(imagem,'fro') - norm(double(imagem_original),'fro')).^2;
+    resultado = 0;
+    for i = escalas;
+        B = imresize(imagem_original, i, 'bilinear');
+        A = imresize(imagem, i, 'bilinear');
+        resultado = sum(sum((A - double(B)).^2)) + resultado;
+    end
+    
 end
 
 function imagem = desenhar_individuo(cromossomo, opcoes)
@@ -48,9 +58,7 @@ function imagem = desenhar_individuo(cromossomo, opcoes)
     
     % desenha o circulo correspondente na imagem
     for i = 1:opcoes.circulos;
-        if (individuo(i,4))
-            imagem = desenhar_circulo(imagem, individuo(i,1), individuo(i,2), opcoes.raio_circulo, individuo(i,3));
-        end
+        imagem = desenhar_circulo(imagem, individuo(i,1), individuo(i,2), individuo(i,4), individuo(i,3));
     end  
 end
 
@@ -79,13 +87,13 @@ function individuo = gerar_individuo(cromossomo, genes_atributo, total_circulos)
     T = circulos(:, [1:genes_atributo(3)] + total_genes);
     T = bi2de(T, 'left-msb');
     
-    % exibe ou nao o circulo
+    % raio do circulo
     total_genes = total_genes + genes_atributo(3);
-    E = circulos(:, [1:genes_atributo(4)] + total_genes);
-    E = bi2de(E, 'left-msb');
+    R = circulos(:, [1:genes_atributo(4)] + total_genes);
+    R = bi2de(R, 'left-msb');
     
     % individuo
-    individuo = [X'; Y'; T'; E']';
+    individuo = [X'; Y'; T'; R']';
 end
 
 function imagem = desenhar_circulo(imagem, dx, dy, raio, tonalidade)
