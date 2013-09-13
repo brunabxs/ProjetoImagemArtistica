@@ -1,4 +1,4 @@
-function [imagem, individuo_perfeito, avaliacao_individuo_perfeito, circulos] = algoritmo_genetico()
+function [imagem, melhor_individuo, avaliacao, circulos, tempo] = algoritmo_genetico()
     start = tic;
     matlabpool open 4;
     
@@ -9,30 +9,40 @@ function [imagem, individuo_perfeito, avaliacao_individuo_perfeito, circulos] = 
     imagem_original = ind2gray(imagem_original, mapa_cores_original);
     
     % opcoes
-    opcoes = struct('bits_atributo', [8, 8, 8, 5], 'circulos', 1000, 'imagem', 256);
+    opcoes = struct('bits_atributo', [8, 8, 8, 5], 'circulos', 1000, 'imagem', 256, 'diretorio_saida', 'solucao/');
     
     % algoritmo genetico
     total_genes = sum(opcoes.bits_atributo) * opcoes.circulos;
-    opcoes_genetico = gaoptimset('PopulationSize', 20, 'PopulationType', 'bitstring', 'Generations', 3000, 'SelectionFcn', @selectionroulette, 'CrossoverFraction', 0.8, 'UseParallel', 'always', 'Vectorized', 'off');
-    [individuo_perfeito, avaliacao_individuo_perfeito] = ga(@(cromossomo)funcao_avaliacao(cromossomo, opcoes, imagem_original), total_genes, [], [], [], [], [], [], [], opcoes_genetico);
+    opcoes_genetico = gaoptimset('PopulationSize', 20, 'PopulationType', 'bitstring', 'Generations', 2, 'SelectionFcn', @selectionroulette, 'CrossoverFraction', 0.8, 'UseParallel', 'always', 'Vectorized', 'off', 'OutputFcns', @(opcoes_saida, estado, flags)gerar_imagem_geracao(opcoes_saida, estado, flags, opcoes));
+    [melhor_individuo, avaliacao, flag, saida] = ga(@(cromossomo)funcao_avaliacao(cromossomo, opcoes, imagem_original), total_genes, [], [], [], [], [], [], [], opcoes_genetico);
     
     % exibe imagem para individuo final
-    imagem = desenhar_individuo(individuo_perfeito, opcoes);
+    imagem = desenhar_individuo(melhor_individuo, opcoes);
     
     % salva as imagens
-    imwrite(imagem, gray(256), 'imagem-aprox.bmp');
-    imwrite(imagem_original, gray(256), 'imagem-original.bmp');
+    imwrite(imagem, gray(256), strcat(opcoes.diretorio_saida, 'imagem-aprox.bmp'));
+    imwrite(imagem_original, gray(256), strcat(opcoes.diretorio_saida, 'imagem-original.bmp'));
     
     % individuo
-    circulos = gerar_individuo(individuo_perfeito, opcoes.bits_atributo, opcoes.circulos);
+    circulos = gerar_individuo(melhor_individuo, opcoes.bits_atributo, opcoes.circulos);
     
     matlabpool close;
-    toc(start)
+    tempo = toc(start);
+    
+    % salva alguns dados em arquivo
+    arquivo = fopen(strcat(opcoes.diretorio_saida, 'arquivo.txt'), 'w');
+    fprintf(arquivo, 'Avaliacao do Melhor Individuo: %f\r\n', avaliacao);
+    fprintf(arquivo, 'Geracoes: %d\r\n', saida.generations);
+    fprintf(arquivo, 'Termino(%d): %s\r\n\r\n', flag, saida.message);
+    fprintf(arquivo, 'Tempo: %f\r\n\r\n', tempo);
+    fclose(arquivo);
 end
 
 function resultado = funcao_avaliacao(cromossomo, opcoes, imagem_original)
-    % gera a imagem
+    % exibe a imagem para individuo
     imagem = desenhar_individuo(cromossomo, opcoes);
+    
+    % calcula as proporcoes como potencias de dois
     [largura] = size(imagem, 1);
     tamanho_max = log2 (largura);
     base = 2 * ones(1, tamanho_max + 1);
@@ -41,11 +51,33 @@ function resultado = funcao_avaliacao(cromossomo, opcoes, imagem_original)
     
     resultado = 0;
     for i = escalas;
+        % reducao das imagens
         B = imresize(imagem_original, i, 'bilinear');
         A = imresize(imagem, i, 'bilinear');
+        
+        % comparacao
         resultado = sum(sum((A - double(B)).^2)) + resultado;
     end
+end
+
+function [estado, opcoes_saida, opcoes_saida_alterdas] = gerar_imagem_geracao(opcoes_saida, estado, flags, opcoes)
+    opcoes_saida_alterdas = [];
     
+    % sendo a primeira das geracoes, nao precisa gerar imagem
+    if estado.Generation == 0
+        return
+    end
+    
+    % encontra o melhor individuo da geracao atual
+    melhores_pontuacoes = find(estado.Score == estado.Best(1, estado.Generation));
+    melhores_individuos = estado.Population(melhores_pontuacoes, :);
+    melhor_individuo = melhores_individuos(1, :);
+    
+    % exibe imagem para individuo
+    imagem = desenhar_individuo(melhor_individuo, opcoes);
+    
+    % salva a imagem
+    imwrite(imagem, gray(256), strcat(opcoes.diretorio_saida, 'imagem-ger', num2str(estado.Generation), '.bmp'));
 end
 
 function imagem = desenhar_individuo(cromossomo, opcoes)
