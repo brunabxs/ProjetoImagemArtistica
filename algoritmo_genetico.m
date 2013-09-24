@@ -48,7 +48,7 @@ function resultado = funcao_avaliacao_simples(cromossomo, opcoes, imagem_origina
     % exibe a imagem para individuo
     imagem = desenhar_individuo(cromossomo, opcoes);
     
-    resultado = sum(sum((imagem_original - double(imagem)).^2));
+    resultado = sum(sum((imagem - double(imagem_original)).^2));
 end
 
 function resultado = funcao_avaliacao_resolucao_sem_peso(cromossomo, opcoes, imagem_original)
@@ -71,9 +71,36 @@ function resultado = funcao_avaliacao_resolucao_sem_peso(cromossomo, opcoes, ima
         % comparacao
         resultado = sum(sum((A - double(B)).^2)) + resultado;
     end
-    
-    %resultado = sum(sum((imagem_original - double(imagem)).^2));
 end
+
+function resultado = funcao_avaliacao_resolucao_com_peso(cromossomo, opcoes, imagem_original)
+    % exibe a imagem para individuo
+    imagem = desenhar_individuo(cromossomo, opcoes);
+    
+    % calcula as proporcoes como potencias de dois
+    [largura] = size(imagem, 1);
+    tamanho_max = log2 (largura);
+    base = 2 * ones(1, tamanho_max + 1);
+    expoente = - 1 * (0 : tamanho_max);
+    escalas = base.^expoente;
+    
+    resultado = 0;
+    for i = escalas;
+        % reducao das imagens
+        B = imresize(imagem_original, i, 'bilinear');
+        A = imresize(imagem, i, 'bilinear');
+        
+        % peso do resultado
+        peso = find(escalas == i);
+        
+        % comparacao
+        resultado = peso * sum(sum((A - double(B)).^2)) + resultado;
+    end
+    
+    % media ponderada
+    resultado = resultado / sum(1:size(escalas, 1));
+end
+
 
 function [estado, opcoes_saida, opcoes_saida_alterdas] = gerar_imagem_geracao(opcoes_saida, estado, flags, opcoes)
     opcoes_saida_alterdas = [];
